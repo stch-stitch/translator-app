@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Translator for my wife
 
-## Getting Started
+Ollama 로컬 LLM을 사용한 영한 번역 앱입니다. 긴 텍스트를 문단 단위로 분절하여 순차적으로 번역합니다.
 
-First, run the development server:
+## 주요 기능
 
+- 긴 영어 텍스트를 빈 줄 기준으로 문단 분절 후 순차 번역
+- 번역 진행 중 실시간 스트리밍 출력
+- 번역 일시 중지(Stop) / 재개(Resume) / 취소(Cancel)
+- 각 문단 개별 삭제
+- 번역 지침 입력 (브라우저 재시작 후에도 유지)
+- 번역 이력 저장 (localStorage 영속)
+
+## 사전 요구사항
+
+- Node.js 18+
+- [Ollama](https://ollama.ai) 실행 중인 서버 (gemma4:26b 모델)
+
+## 설치 및 실행
+
+**macOS / Linux:**
 ```bash
+git clone https://github.com/stch-stitch/translator-app.git
+cd translator-app
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Windows 11 (PowerShell):**
+```powershell
+git clone https://github.com/stch-stitch/translator-app.git
+cd translator-app
+npm install
+npm run dev
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+브라우저에서 [http://localhost:3000](http://localhost:3000) 접속
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 환경변수
 
-## Learn More
+| 변수 | 기본값 | 설명 |
+|------|--------|------|
+| `OLLAMA_API_URL` | `http://localhost:11434` | Ollama 서버 주소 |
+| `OLLAMA_MODEL` | `gemma4:26b` | 사용할 모델명 |
 
-To learn more about Next.js, take a look at the following resources:
+**macOS / Linux:**
+```bash
+# .env.local 파일 생성
+echo "OLLAMA_API_URL=http://your-ollama-ip:11434" > .env.local
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Windows 11 (PowerShell):**
+```powershell
+# .env.local 파일 생성
+"OLLAMA_API_URL=http://your-ollama-ip:11434" | Out-File -Encoding utf8 .env.local
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Vercel 배포
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Vercel 대시보드에서 이 레포를 import
+2. Environment Variables에 `OLLAMA_API_URL` 설정 (Ollama 서버의 외부 접근 가능한 주소)
+3. Deploy
