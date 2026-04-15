@@ -4,6 +4,15 @@ const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma4:26b';
 
 export async function POST(req: Request): Promise<Response> {
+  const secret = process.env.APP_SECRET;
+  if (secret) {
+    const auth = req.headers.get('Authorization');
+    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+    if (token !== secret) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
   const { text, instructions } = await req.json();
 
   if (!text || typeof text !== 'string') {

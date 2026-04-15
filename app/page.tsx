@@ -2,6 +2,68 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
+const TOKEN_KEY = 'app_token';
+
+function PasswordGate({ onAuth }: { onAuth: (token: string) => void }) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isChecking, setIsChecking] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    setIsChecking(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+
+      if (res.ok) {
+        sessionStorage.setItem(TOKEN_KEY, password);
+        onAuth(password);
+      } else {
+        setError('비밀번호가 올바르지 않습니다.');
+      }
+    } catch {
+      setError('서버에 연결할 수 없습니다.');
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="w-full max-w-sm p-8 bg-white border rounded-xl shadow-sm space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-blue-600">♪ Translator for my wife</h1>
+          <p className="text-sm text-gray-400 mt-1">by Hb</p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="비밀번호를 입력하세요"
+            className="w-full px-4 py-3 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            autoFocus
+          />
+          {error && <p className="text-sm text-red-500">{error}</p>}
+          <button
+            type="submit"
+            disabled={isChecking || !password}
+            className="w-full py-3 bg-blue-600 text-white rounded-full font-bold hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+          >
+            {isChecking ? '확인 중...' : '입장'}
+          </button>
+        </form>
+      </div>
+    </main>
+  );
+}
+
 type SegmentStatus = 'pending' | 'translating' | 'done' | 'error';
 
 interface ParagraphSegment {
@@ -77,6 +139,7 @@ function splitIntoParagraphs(text: string): string[] {
 }
 
 export default function TranslatorPage() {
+  const [token, setToken] = useState<string | null>(null);
   const [rawInput, setRawInput] = useState('');
   const [instructions, setInstructions] = useState('');
   const [segments, setSegments] = useState<ParagraphSegment[]>([]);
@@ -89,19 +152,37 @@ export default function TranslatorPage() {
   // Mirror of segments state — readable synchronously inside async loops
   const segmentsRef = useRef<ParagraphSegment[]>([]);
   const instructionsRef = useRef('');
+  const tokenRef = useRef<string | null>(null);
   const nextSegId = useRef(0);
   const nextHistId = useRef(0);
 
   useEffect(() => {
+    const saved = sessionStorage.getItem(TOKEN_KEY);
+    if (saved) {
+      setToken(saved);
+      tokenRef.current = saved;
+    }
+
     const stored = loadHistory();
     setHistory(stored);
     if (stored.length > 0) {
       nextHistId.current = Math.max(...stored.map((e) => e.id)) + 1;
     }
-    const saved = loadInstructions();
-    setInstructions(saved);
-    instructionsRef.current = saved;
+    const savedInstructions = loadInstructions();
+    setInstructions(savedInstructions);
+    instructionsRef.current = savedInstructions;
   }, []);
+
+  if (token === null) {
+    return (
+      <PasswordGate
+        onAuth={(t) => {
+          setToken(t);
+          tokenRef.current = t;
+        }}
+      />
+    );
+  }
 
   useEffect(() => {
     if (isTranslating) {
@@ -137,7 +218,10 @@ export default function TranslatorPage() {
   ): Promise<string> => {
     const response = await fetch('/api/translate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {}),
+      },
       body: JSON.stringify({ text, instructions: instructionsRef.current.trim() }),
       signal,
     });
