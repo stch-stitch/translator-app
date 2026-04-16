@@ -2,7 +2,65 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
+type SegmentStatus = 'pending' | 'translating' | 'done' | 'error';
+
+interface ParagraphSegment {
+  id: number;
+  english: string;
+  korean: string | null;
+  status: SegmentStatus;
+}
+
+interface HistoryEntry {
+  id: number;
+  segments: ParagraphSegment[];
+  translatedAt: string;
+}
+
 const TOKEN_KEY = 'app_token';
+const STORAGE_KEY = 'translator-history';
+const INSTRUCTIONS_KEY = 'translator-instructions';
+const DEFAULT_INSTRUCTIONS =
+  '단 하나의 문장도 빠짐 없이 번역을 진행해줘. 너의 다른 상식을 섞지 말고 번역 의뢰한 문장을 번역하는데만 집중해.';
+
+function loadHistory(): HistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (e) => e && typeof e.id === 'number' && Array.isArray(e.segments) && typeof e.translatedAt === 'string'
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(entries: HistoryEntry[]): void {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); } catch {}
+}
+
+function loadInstructions(): string {
+  try { return localStorage.getItem(INSTRUCTIONS_KEY) ?? DEFAULT_INSTRUCTIONS; } catch { return DEFAULT_INSTRUCTIONS; }
+}
+
+function saveInstructions(value: string): void {
+  try { localStorage.setItem(INSTRUCTIONS_KEY, value); } catch {}
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleString('ko-KR', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+}
+
+function splitIntoParagraphs(text: string): string[] {
+  return text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
+}
+
+// ─── Password Gate ────────────────────────────────────────────────────────────
 
 function PasswordGate({ onAuth }: { onAuth: (token: string) => void }) {
   const [password, setPassword] = useState('');
@@ -13,16 +71,13 @@ function PasswordGate({ onAuth }: { onAuth: (token: string) => void }) {
     e.preventDefault();
     setIsChecking(true);
     setError('');
-
     try {
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       });
-
       if (res.ok) {
-        sessionStorage.setItem(TOKEN_KEY, password);
         onAuth(password);
       } else {
         setError('비밀번호가 올바르지 않습니다.');
@@ -38,7 +93,7 @@ function PasswordGate({ onAuth }: { onAuth: (token: string) => void }) {
     <main className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm p-8 bg-white border rounded-xl shadow-sm space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-blue-600">♪ Translator for my wife</h1>
+          <h1 className="text-2xl font-bold text-blue-600">Translator for my wife</h1>
           <p className="text-sm text-gray-400 mt-1">by Hb</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -64,82 +119,9 @@ function PasswordGate({ onAuth }: { onAuth: (token: string) => void }) {
   );
 }
 
-type SegmentStatus = 'pending' | 'translating' | 'done' | 'error';
+// ─── Translator App ───────────────────────────────────────────────────────────
 
-interface ParagraphSegment {
-  id: number;
-  english: string;
-  korean: string | null;
-  status: SegmentStatus;
-}
-
-interface HistoryEntry {
-  id: number;
-  segments: ParagraphSegment[];
-  translatedAt: string;
-}
-
-const STORAGE_KEY = 'translator-history';
-const INSTRUCTIONS_KEY = 'translator-instructions';
-
-function loadHistory(): HistoryEntry[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (entry) =>
-        entry &&
-        typeof entry.id === 'number' &&
-        Array.isArray(entry.segments) &&
-        typeof entry.translatedAt === 'string'
-    );
-  } catch {
-    return [];
-  }
-}
-
-function saveHistory(entries: HistoryEntry[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-  } catch {}
-}
-
-const DEFAULT_INSTRUCTIONS =
-  '단 하나의 문장도 빠짐 없이 번역을 진행해줘. 너의 다른 상식을 섞지 말고 번역 의뢰한 문장을 번역하는데만 집중해.';
-
-function loadInstructions(): string {
-  try {
-    return localStorage.getItem(INSTRUCTIONS_KEY) ?? DEFAULT_INSTRUCTIONS;
-  } catch {
-    return DEFAULT_INSTRUCTIONS;
-  }
-}
-
-function saveInstructions(value: string): void {
-  try {
-    localStorage.setItem(INSTRUCTIONS_KEY, value);
-  } catch {}
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-}
-
-function splitIntoParagraphs(text: string): string[] {
-  return text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
-}
-
-export default function TranslatorPage() {
-  const [token, setToken] = useState<string | null>(null);
+function TranslatorApp({ token }: { token: string }) {
   const [rawInput, setRawInput] = useState('');
   const [instructions, setInstructions] = useState('');
   const [segments, setSegments] = useState<ParagraphSegment[]>([]);
@@ -149,20 +131,17 @@ export default function TranslatorPage() {
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  // Mirror of segments state — readable synchronously inside async loops
   const segmentsRef = useRef<ParagraphSegment[]>([]);
   const instructionsRef = useRef('');
-  const tokenRef = useRef<string | null>(null);
+  const tokenRef = useRef(token);
   const nextSegId = useRef(0);
   const nextHistId = useRef(0);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem(TOKEN_KEY);
-    if (saved) {
-      setToken(saved);
-      tokenRef.current = saved;
-    }
+    tokenRef.current = token;
+  }, [token]);
 
+  useEffect(() => {
     const stored = loadHistory();
     setHistory(stored);
     if (stored.length > 0) {
@@ -173,33 +152,16 @@ export default function TranslatorPage() {
     instructionsRef.current = savedInstructions;
   }, []);
 
-  if (token === null) {
-    return (
-      <PasswordGate
-        onAuth={(t) => {
-          setToken(t);
-          tokenRef.current = t;
-        }}
-      />
-    );
-  }
-
   useEffect(() => {
     if (isTranslating) {
       setElapsed(0);
       timerRef.current = setInterval(() => setElapsed((prev) => prev + 1), 1000);
     } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isTranslating]);
 
-  // Keep ref in sync with state changes (e.g. segment deletes during translation)
   const patchSegments = useCallback(
     (updater: (prev: ParagraphSegment[]) => ParagraphSegment[]) => {
       setSegments((prev) => {
@@ -220,7 +182,7 @@ export default function TranslatorPage() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {}),
+        Authorization: `Bearer ${tokenRef.current}`,
       },
       body: JSON.stringify({ text, instructions: instructionsRef.current.trim() }),
       signal,
@@ -234,14 +196,12 @@ export default function TranslatorPage() {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let full = '';
-
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       full += decoder.decode(value, { stream: true });
       onChunk(full);
     }
-
     return full;
   };
 
@@ -250,11 +210,9 @@ export default function TranslatorPage() {
     abortRef.current = controller;
     setIsTranslating(true);
 
-    // Process all non-done segments in order
     const snapshot = segmentsRef.current;
 
     for (const seg of snapshot) {
-      // Skip already done, or deleted segments
       if (seg.status === 'done') continue;
       if (!segmentsRef.current.find((s) => s.id === seg.id)) continue;
 
@@ -272,16 +230,13 @@ export default function TranslatorPage() {
           },
           controller.signal
         );
-
         patchSegments((prev) =>
           prev.map((s) => (s.id === seg.id ? { ...s, korean, status: 'done' } : s))
         );
       } catch (err) {
         const isAbort = err instanceof DOMException && err.name === 'AbortError';
         patchSegments((prev) =>
-          prev.map((s) =>
-            s.id === seg.id ? { ...s, korean: null, status: isAbort ? 'pending' : 'error' } : s
-          )
+          prev.map((s) => (s.id === seg.id ? { ...s, korean: null, status: isAbort ? 'pending' : 'error' } : s))
         );
         if (isAbort) break;
       }
@@ -289,7 +244,6 @@ export default function TranslatorPage() {
 
     setIsTranslating(false);
 
-    // Save to history only when fully complete (no pending remaining)
     const final = segmentsRef.current;
     const allSettled = final.length > 0 && final.every((s) => s.status === 'done' || s.status === 'error');
     if (allSettled) {
@@ -310,25 +264,20 @@ export default function TranslatorPage() {
   const handleTranslate = async (): Promise<void> => {
     const paragraphs = splitIntoParagraphs(rawInput);
     if (!paragraphs.length) return;
-
     const initial: ParagraphSegment[] = paragraphs.map((p) => ({
       id: nextSegId.current++,
       english: p,
       korean: null,
       status: 'pending',
     }));
-
     segmentsRef.current = initial;
     setSegments(initial);
     await runTranslation();
   };
 
-  const handleStop = (): void => {
-    abortRef.current?.abort();
-  };
+  const handleStop = (): void => { abortRef.current?.abort(); };
 
   const handleResume = async (): Promise<void> => {
-    // Reset error segments so they get retried
     patchSegments((prev) =>
       prev.map((s) => (s.status === 'error' ? { ...s, status: 'pending' } : s))
     );
@@ -368,7 +317,7 @@ export default function TranslatorPage() {
               instructionsRef.current = e.target.value;
               saveInstructions(e.target.value);
             }}
-            placeholder="e.g. Use formal speech level (합쇼체). Preserve technical terms in English. Keep a warm and friendly tone."
+            placeholder={DEFAULT_INSTRUCTIONS}
           />
         </div>
 
@@ -391,29 +340,18 @@ export default function TranslatorPage() {
           >
             {isTranslating ? `${doneCount} / ${segments.length} · ${elapsed}s` : 'Translate'}
           </button>
-
           {isTranslating && (
-            <button
-              onClick={handleStop}
-              className="px-6 py-3 bg-red-500 text-white rounded-full font-bold hover:bg-red-600 transition-colors"
-            >
+            <button onClick={handleStop} className="px-6 py-3 bg-red-500 text-white rounded-full font-bold hover:bg-red-600 transition-colors">
               Stop
             </button>
           )}
-
           {!isTranslating && hasPending && (
             <>
-              <button
-                onClick={handleResume}
-                className="px-6 py-3 bg-green-600 text-white rounded-full font-bold hover:bg-green-700 transition-colors"
-              >
+              <button onClick={handleResume} className="px-6 py-3 bg-green-600 text-white rounded-full font-bold hover:bg-green-700 transition-colors">
                 Resume
               </button>
               <button
-                onClick={() => {
-                  segmentsRef.current = [];
-                  setSegments([]);
-                }}
+                onClick={() => { segmentsRef.current = []; setSegments([]); }}
                 className="px-6 py-3 bg-gray-400 text-white rounded-full font-bold hover:bg-gray-500 transition-colors"
               >
                 Cancel
@@ -454,15 +392,9 @@ export default function TranslatorPage() {
                 <div>
                   <p className="text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">Korean</p>
                   {seg.status === 'pending' && <p className="text-sm text-gray-300">—</p>}
-                  {seg.status === 'translating' && (
-                    <p className="text-sm text-gray-400 animate-pulse">Translating...</p>
-                  )}
-                  {seg.status === 'done' && (
-                    <p className="text-sm whitespace-pre-wrap">{seg.korean}</p>
-                  )}
-                  {seg.status === 'error' && (
-                    <p className="text-sm text-red-400">Translation failed — will retry on Resume</p>
-                  )}
+                  {seg.status === 'translating' && <p className="text-sm text-gray-400 animate-pulse">Translating...</p>}
+                  {seg.status === 'done' && <p className="text-sm whitespace-pre-wrap">{seg.korean}</p>}
+                  {seg.status === 'error' && <p className="text-sm text-red-400">Translation failed — will retry on Resume</p>}
                 </div>
               </div>
             ))}
@@ -507,4 +439,25 @@ export default function TranslatorPage() {
       </div>
     </main>
   );
+}
+
+// ─── Page (Auth Wrapper) ──────────────────────────────────────────────────────
+
+export default function Page() {
+  // 'loading' → haven't checked sessionStorage yet (prevents flash of password screen)
+  const [token, setToken] = useState<string | 'loading' | null>('loading');
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem(TOKEN_KEY);
+    setToken(saved ?? null);
+  }, []);
+
+  const handleAuth = useCallback((t: string) => {
+    sessionStorage.setItem(TOKEN_KEY, t);
+    setToken(t);
+  }, []);
+
+  if (token === 'loading') return null;
+  if (token === null) return <PasswordGate onAuth={handleAuth} />;
+  return <TranslatorApp token={token} />;
 }

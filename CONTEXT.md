@@ -33,3 +33,24 @@
 ### 참고 사항
 - `src/app/` 디렉토리는 이전 LLM이 생성한 미사용 파일들 (무시해도 됨)
 - Vercel 배포 시 `OLLAMA_API_URL`을 외부 접근 가능한 Ollama 서버 주소로 설정 필요
+- `OLLAMA_API_URL`은 Tailscale Funnel 공개 URL 사용 권장 (`tailscale funnel 11434`)
+
+## 2026-04-16 인증 및 React #310 에러 수정
+
+### 변경 사항
+- `app/api/auth/route.ts` — 비밀번호 인증 API 추가 (`APP_SECRET` env var 기반)
+- `app/api/translate/route.ts` — `Authorization: Bearer <secret>` 헤더 검증 추가
+- `app/page.tsx` — React error #310 수정을 위해 3개 컴포넌트로 분리
+  - `Page`: sessionStorage 확인 후 `PasswordGate` 또는 `TranslatorApp` 렌더
+  - `PasswordGate`: 비밀번호 입력 폼
+  - `TranslatorApp`: 모든 번역 훅/로직 (token을 prop으로 수신)
+- `app/icon.svg` — 8분음표 파비콘 (파란 모서리 깎은 사각형 배경)
+
+### 작업 목적
+- React 19 + Next.js 16에서 조건부 렌더 이전에 훅이 호출되면 error #310 발생
+- 비밀번호 게이트를 별도 컴포넌트로 분리하여 훅 규칙 위반 해소
+- `token` 초기값을 `'loading'`으로 설정해 sessionStorage 확인 전 PasswordGate 깜박임 방지
+
+### 참고 사항
+- `APP_SECRET` 환경변수가 없으면 인증 없이 동작 (로컬 개발 편의)
+- Vercel에 `APP_SECRET` 설정 필수 (미설정 시 auth API가 500 반환)
