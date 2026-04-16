@@ -33,8 +33,8 @@ export function GlossarySidebar({ glossary, onChange }: GlossarySidebarProps) {
 
   return (
     <div>
-      <p className="text-xs font-bold uppercase tracking-wide mb-3 text-slate-500 dark:text-slate-400">
-        📖 용어집
+      <p className="text-xs font-bold tracking-wide mb-3 text-slate-500 dark:text-slate-400">
+        영문→국문 사전 매핑
       </p>
 
       {/* 용어 목록 */}
@@ -63,28 +63,33 @@ export function GlossarySidebar({ glossary, onChange }: GlossarySidebarProps) {
         ))}
       </div>
 
-      {/* 용어 추가 */}
+      {/* 용어 추가 — 목록 행과 동일 [영문] → [국문] */}
       <div className="space-y-1.5">
-        <input
-          type="text"
-          value={engInput}
-          onChange={e => setEngInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="영어"
-          className="w-full text-xs px-2 py-1.5 rounded border outline-none
-            border-slate-200 bg-white text-slate-700 placeholder-slate-400 focus:border-blue-400
-            dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:placeholder-slate-600 dark:focus:border-blue-500"
-        />
-        <input
-          type="text"
-          value={korInput}
-          onChange={e => setKorInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="한국어"
-          className="w-full text-xs px-2 py-1.5 rounded border outline-none
-            border-slate-200 bg-white text-slate-700 placeholder-slate-400 focus:border-blue-400
-            dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:placeholder-slate-600 dark:focus:border-blue-500"
-        />
+        <div className="flex items-center gap-1.5">
+          <input
+            type="text"
+            value={engInput}
+            onChange={e => setEngInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="영문"
+            className="min-w-0 flex-1 text-xs px-2 py-1 rounded border outline-none
+              border-slate-200 bg-white text-slate-700 placeholder-slate-400 focus:border-blue-400
+              dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:placeholder-slate-600 dark:focus:border-blue-500"
+          />
+          <span className="shrink-0 text-xs text-slate-400" aria-hidden>
+            →
+          </span>
+          <input
+            type="text"
+            value={korInput}
+            onChange={e => setKorInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="국문"
+            className="min-w-0 flex-1 text-xs px-2 py-1 rounded border outline-none
+              border-slate-200 bg-white text-slate-700 placeholder-slate-400 focus:border-blue-400
+              dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:placeholder-slate-600 dark:focus:border-blue-500"
+          />
+        </div>
         <button
           onClick={handleAdd}
           disabled={!engInput.trim() || !korInput.trim()}

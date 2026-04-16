@@ -8,7 +8,7 @@ import type { Theme } from '@/types/translator';
 const THEME_KEY = 'translator-theme';
 
 function loadTheme(): Theme {
-  try { return (localStorage.getItem(THEME_KEY) as Theme) ?? 'dark'; } catch { return 'dark'; }
+  try { return (localStorage.getItem(THEME_KEY) as Theme) ?? 'light'; } catch { return 'light'; }
 }
 
 // ─── Password Gate ────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ export default function AppContent({
   token: string | null;
   handleAuth: (t: string) => void;
 }) {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>('light');
 
   useEffect(() => {
     setTheme(loadTheme());

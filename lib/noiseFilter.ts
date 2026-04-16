@@ -62,6 +62,6 @@ export function applyNoiseFilter(text: string, config: NoiseFilterConfig): strin
     lines = lines.filter(l => !/^\s*(Figure|Fig\.|Table)\s+\d+[\s.:]/i.test(l));
   }
 
-  // 연속된 빈 줄 정리
-  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  // 연속된 빈 줄 정리 — 전체 trim()은 금지: 사용자가 입력 중인 앞뒤 스페이스까지 지워져 스페이스 입력이 막히는 현상 방지
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+|\n+$/g, '');
 }

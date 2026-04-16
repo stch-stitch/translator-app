@@ -17,7 +17,7 @@ export function DarkModeToggle({ theme, onToggle }: DarkModeToggleProps) {
         dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
       title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
     >
-      {theme === 'dark' ? '☀️ 라이트' : '🌙 다크'}
+      {theme === 'dark' ? '🌙 다크' : '☀️ 라이트'}
     </button>
   );
 }

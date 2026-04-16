@@ -3,10 +3,15 @@ import type { GlossaryEntry } from '@/types/translator';
 
 const GLOSSARY_KEY = 'translator-glossary';
 
+/** 최초 방문(저장소 없음) 시에만 쓰이는 기본 매핑. 사용자가 삭제하면 빈 배열로 유지됨. */
+export function getDefaultGlossary(): GlossaryEntry[] {
+  return [{ id: 1, english: 'Beethoven', korean: '베에토벤' }];
+}
+
 export function loadGlossary(): GlossaryEntry[] {
   try {
     const raw = localStorage.getItem(GLOSSARY_KEY);
-    if (!raw) return [];
+    if (!raw) return getDefaultGlossary();
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(

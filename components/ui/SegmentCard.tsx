@@ -24,41 +24,74 @@ export function SegmentCard({ segment: seg, isTranslating, onDelete, onRetry }: 
       {/* 액션 버튼 */}
       <div className="absolute top-3 right-3 flex items-center gap-1.5">
         {seg.status === 'done' && (
-          <button
-            onClick={() => onRetry(seg.id)}
-            disabled={isTranslating}
-            title="이 단락만 재번역"
-            className="text-xs px-2 py-1 rounded transition-colors
-              bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700
-              dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600 dark:hover:text-slate-200
-              disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            ↺
-          </button>
+          <span className="relative group inline-flex">
+            <button
+              type="button"
+              onClick={() => onRetry(seg.id)}
+              disabled={isTranslating}
+              aria-label="이 단락만 다시 번역"
+              className="text-xs px-2 py-1 rounded transition-colors
+                bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700
+                dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600 dark:hover:text-slate-200
+                disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ↺
+            </button>
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute right-0 bottom-full z-20 mb-1 whitespace-nowrap rounded px-2 py-1 text-[10px] font-medium
+                bg-slate-800 text-white shadow-md opacity-0 transition-opacity duration-150
+                group-hover:opacity-100 group-focus-within:opacity-100 dark:bg-slate-950 dark:ring-1 dark:ring-slate-600"
+            >
+              이 단락만 다시 번역
+            </span>
+          </span>
         )}
         {seg.status === 'done' && seg.korean && (
-          <button
-            onClick={() => navigator.clipboard.writeText(seg.korean ?? '')}
-            title="한국어 복사"
-            className="p-1 transition-colors text-slate-400 hover:text-blue-500 dark:text-slate-500 dark:hover:text-blue-400"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-          </button>
+          <span className="relative group inline-flex">
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(seg.korean ?? '')}
+              aria-label="한국어 번역문 클립보드에 복사"
+              className="p-1 transition-colors text-slate-400 hover:text-blue-500 dark:text-slate-500 dark:hover:text-blue-400"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute right-0 bottom-full z-20 mb-1 whitespace-nowrap rounded px-2 py-1 text-[10px] font-medium
+                bg-slate-800 text-white shadow-md opacity-0 transition-opacity duration-150
+                group-hover:opacity-100 group-focus-within:opacity-100 dark:bg-slate-950 dark:ring-1 dark:ring-slate-600"
+            >
+              한국어 번역문 복사
+            </span>
+          </span>
         )}
         {seg.status !== 'translating' && (
-          <button
-            onClick={() => onDelete(seg.id)}
-            title="삭제"
-            className="p-1 transition-colors text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-            </svg>
-          </button>
+          <span className="relative group inline-flex">
+            <button
+              type="button"
+              onClick={() => onDelete(seg.id)}
+              aria-label="이 단락 삭제"
+              className="p-1 transition-colors text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+              </svg>
+            </button>
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute right-0 bottom-full z-20 mb-1 whitespace-nowrap rounded px-2 py-1 text-[10px] font-medium
+                bg-slate-800 text-white shadow-md opacity-0 transition-opacity duration-150
+                group-hover:opacity-100 group-focus-within:opacity-100 dark:bg-slate-950 dark:ring-1 dark:ring-slate-600"
+            >
+              이 단락 목록에서 삭제
+            </span>
+          </span>
         )}
       </div>
 

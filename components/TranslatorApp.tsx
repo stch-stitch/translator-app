@@ -313,24 +313,10 @@ export function TranslatorApp({ token, theme, onToggleTheme }: TranslatorAppProp
         {/* 헤더 */}
         <header className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-baseline gap-2">
-            <h1 className="text-xl font-bold text-blue-600 dark:text-blue-400">Translator for my Yf</h1>
-            <span className="text-xs text-slate-400">by Hb</span>
+            <h1 className="text-xl font-bold text-blue-600 dark:text-blue-400">Translator for</h1>
+            <span className="text-xs text-slate-400">my Yf by Hb</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsThink(v => !v)}
-              disabled={isTranslating}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                isThink
-                  ? 'bg-purple-600 text-white ring-2 ring-purple-300 ring-opacity-50'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
-              } disabled:opacity-50`}
-              title={isThink ? 'Thinking Mode: ON' : 'Thinking Mode: OFF'}
-            >
-              🧠 사고력 강화
-            </button>
-            <DarkModeToggle theme={theme} onToggle={onToggleTheme} />
-          </div>
+          <DarkModeToggle theme={theme} onToggle={onToggleTheme} />
         </header>
 
         {/* 스텝 탭 */}
@@ -364,6 +350,10 @@ export function TranslatorApp({ token, theme, onToggleTheme }: TranslatorAppProp
             {activeStep === 1 && (
               <StepPdfClean
                 isTranslating={isTranslating}
+                isThink={isThink}
+                instructions={instructions}
+                onToggleThink={() => setIsThink(v => !v)}
+                onInstructionsChange={handleInstructionsChange}
                 onStartTranslation={handleStartTranslation}
               />
             )}
@@ -391,18 +381,6 @@ export function TranslatorApp({ token, theme, onToggleTheme }: TranslatorAppProp
           {/* 우측 사이드바 */}
           <aside className="w-56 shrink-0 p-4 border-l border-slate-200 dark:border-slate-800 space-y-5">
             <GlossarySidebar glossary={glossary} onChange={handleGlossaryChange} />
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-              <p className="text-xs font-bold uppercase tracking-wide mb-2 text-slate-500 dark:text-slate-400">
-                📋 번역 규칙
-              </p>
-              <textarea
-                value={instructions}
-                onChange={e => handleInstructionsChange(e.target.value)}
-                className="w-full h-24 text-xs p-2 rounded border resize-none outline-none
-                  border-slate-200 bg-slate-50 text-slate-700 focus:border-blue-400
-                  dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:focus:border-blue-500"
-              />
-            </div>
           </aside>
         </div>
       </div>

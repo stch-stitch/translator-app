@@ -1,7 +1,7 @@
 // components/steps/StepPdfClean.tsx
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useLayoutEffect } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { detectNoise, applyNoiseFilter, DEFAULT_NOISE_CONFIG } from '@/lib/noiseFilter';
 import type { NoiseFilterConfig } from '@/types/translator';
@@ -10,10 +10,14 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.6.205/b
 
 interface StepPdfCleanProps {
   isTranslating: boolean;
+  isThink: boolean;
+  instructions: string;
+  onToggleThink: () => void;
+  onInstructionsChange: (value: string) => void;
   onStartTranslation: (text: string) => void;
 }
 
-export function StepPdfClean({ isTranslating, onStartTranslation }: StepPdfCleanProps) {
+export function StepPdfClean({ isTranslating, isThink, instructions, onToggleThink, onInstructionsChange, onStartTranslation }: StepPdfCleanProps) {
   const [rawText, setRawText] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [totalPages, setTotalPages] = useState(0);
@@ -24,6 +28,15 @@ export function StepPdfClean({ isTranslating, onStartTranslation }: StepPdfClean
   const [pdfError, setPdfError] = useState('');
   const [noiseConfig, setNoiseConfig] = useState<NoiseFilterConfig>(DEFAULT_NOISE_CONFIG);
   const [detectedNoise, setDetectedNoise] = useState<{ pageNumbers: number; runningHeaders: number; figureCaptions: number } | null>(null);
+  const instructionsRef = useRef<HTMLTextAreaElement>(null);
+  const INSTRUCTIONS_MIN_PX = 55;
+
+  useLayoutEffect(() => {
+    const el = instructionsRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(el.scrollHeight, INSTRUCTIONS_MIN_PX)}px`;
+  }, [instructions]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -219,17 +232,41 @@ export function StepPdfClean({ isTranslating, onStartTranslation }: StepPdfClean
 
       {pdfError && <p className="text-sm text-red-500">{pdfError}</p>}
 
-      {/* 번역 시작 버튼 */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleStart}
-          disabled={isTranslating || !textToTranslate.trim()}
-          className="px-8 py-3 rounded-full font-bold text-sm transition-colors
-            bg-blue-600 text-white hover:bg-blue-700
-            disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
-        >
-          번역 시작 →
-        </button>
+      {/* 번역 액션 바 */}
+      <div className="flex items-center gap-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 overflow-hidden">
+        <textarea
+          ref={instructionsRef}
+          value={instructions}
+          onChange={e => onInstructionsChange(e.target.value)}
+          placeholder="번역 규칙을 입력하세요…"
+          rows={1}
+          className="flex-1 min-w-0 min-h-[55px] text-xs px-4 py-3 resize-none outline-none overflow-hidden
+            bg-transparent text-slate-700 placeholder-slate-400
+            dark:text-slate-300 dark:placeholder-slate-500"
+        />
+        <div className="flex items-center gap-2 px-3 shrink-0">
+          <button
+            onClick={onToggleThink}
+            disabled={isTranslating}
+            className={`px-4 py-3 rounded-lg text-xs font-medium transition-colors ${
+              isThink
+                ? 'bg-purple-600 text-white ring-2 ring-purple-300/50'
+                : 'bg-white text-slate-500 hover:bg-slate-100 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600'
+            } disabled:opacity-50`}
+            title={isThink ? 'Thinking Mode: ON' : 'Thinking Mode: OFF'}
+          >
+            🧠 사고력 강화
+          </button>
+          <button
+            onClick={handleStart}
+            disabled={isTranslating || !textToTranslate.trim()}
+            className="px-6 py-3 rounded-lg font-bold text-xs transition-colors
+              bg-blue-600 text-white hover:bg-blue-700
+              disabled:bg-slate-300 dark:disabled:bg-slate-600 disabled:text-slate-500 disabled:cursor-not-allowed"
+          >
+            번역 시작 →
+          </button>
+        </div>
       </div>
     </div>
   );

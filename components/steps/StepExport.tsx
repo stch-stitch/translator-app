@@ -18,7 +18,7 @@ function formatDate(iso: string): string {
 }
 
 export function StepExport({ segments, history, onDeleteHistory }: StepExportProps) {
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'copiedBi'>('idle');
+  const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle');
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const doneSegments = segments.filter(s => s.status === 'done' && s.korean);
@@ -33,21 +33,23 @@ export function StepExport({ segments, history, onDeleteHistory }: StepExportPro
     setTimeout(() => setCopyState('idle'), 2000);
   };
 
-  const handleDownload = (): void => {
-    const blob = new Blob([koreanText], { type: 'text/plain;charset=utf-8' });
+  const downloadTxt = (content: string, baseName: string): void => {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const ts = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
     a.href = url;
-    a.download = `translated_${ts}.txt`;
+    a.download = `${baseName}_${ts}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const handleCopyBilingual = async (): Promise<void> => {
-    await navigator.clipboard.writeText(bilingualText);
-    setCopyState('copiedBi');
-    setTimeout(() => setCopyState('idle'), 2000);
+  const handleDownload = (): void => {
+    downloadTxt(koreanText, 'translated');
+  };
+
+  const handleDownloadBilingual = (): void => {
+    downloadTxt(bilingualText, 'bilingual');
   };
 
   if (doneSegments.length === 0) {
@@ -60,19 +62,45 @@ export function StepExport({ segments, history, onDeleteHistory }: StepExportPro
     );
   }
 
+  /* 헤더·탭·본문 패딩·버튼 행·카드 헤더·하단 여백을 대략 반영한 뷰포트 기준 높이 */
+  const previewBodyClass =
+    'p-4 overflow-y-auto min-h-[12rem] h-[calc(100vh-17.5rem)]';
+
   return (
     <div className="space-y-5">
       {/* 내보내기 버튼 */}
       <div className="flex gap-3">
         <button
           onClick={handleCopyKorean}
-          className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
+          className={`flex flex-1 items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
             copyState === 'copied'
-              ? 'bg-green-600 text-white'
-              : 'bg-green-500 hover:bg-green-600 text-white'
+              ? 'bg-blue-700 text-white'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
         >
-          {copyState === 'copied' ? '✓ 복사됨!' : '📋 한국어 전체 복사'}
+          {copyState === 'copied' ? (
+            '✓ 복사됨!'
+          ) : (
+            <>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0 opacity-95"
+                aria-hidden
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+              한국어 전체 복사
+            </>
+          )}
         </button>
         <button
           onClick={handleDownload}
@@ -80,17 +108,15 @@ export function StepExport({ segments, history, onDeleteHistory }: StepExportPro
             border border-slate-200 text-slate-600 hover:bg-slate-50
             dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
         >
-          ⬇ .txt 다운로드
+          번역본 .txt 다운로드
         </button>
         <button
-          onClick={handleCopyBilingual}
-          className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-all
-            border ${copyState === 'copiedBi'
-              ? 'border-green-500 text-green-600 dark:text-green-400'
-              : 'border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800'
-            }`}
+          onClick={handleDownloadBilingual}
+          className="flex-1 py-3 rounded-xl font-semibold text-sm transition-colors
+            border border-slate-200 text-slate-500 hover:bg-slate-50
+            dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
         >
-          {copyState === 'copiedBi' ? '✓ 복사됨!' : '원문+번역 대조본'}
+          원문+번역본 .txt 다운로드
         </button>
       </div>
 
@@ -101,7 +127,7 @@ export function StepExport({ segments, history, onDeleteHistory }: StepExportPro
             미리보기 (한국어 · {doneSegments.length}단락)
           </span>
         </div>
-        <div className="p-4 max-h-64 overflow-y-auto">
+        <div className={previewBodyClass}>
           <p className="text-sm whitespace-pre-wrap text-slate-700 dark:text-slate-300 leading-relaxed">
             {koreanText}
           </p>
