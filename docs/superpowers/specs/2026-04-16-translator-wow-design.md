@@ -188,8 +188,21 @@ interface GlossaryEntry {
 const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 const [glossary, setGlossary] = useState<GlossaryEntry[]>([]);
 const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
-const [noiseFilters, setNoiseFilters] = useState<NoiseFilterConfig>({...});
+const [noiseFilters, setNoiseFilters] = useState<NoiseFilterConfig>({
+  headerFooter: true,
+  referenceNumbers: true,
+  figureCaptions: false,
+});
+
+// NoiseFilterConfig 타입
+interface NoiseFilterConfig {
+  headerFooter: boolean;       // 페이지 헤더/푸터 제거
+  referenceNumbers: boolean;   // [1], (2024) 등 단독 줄 참고문헌 번호
+  figureCaptions: boolean;     // Figure N. / Table N. 캡션
+}
 ```
+
+**Step 탭 네비게이션**: 강제 순서가 아닌 **자유 네비게이션**. 탭을 클릭하면 언제든 이동 가능. 단, ③ 내보내기 탭은 번역 완료 세그먼트가 1개 이상 있을 때만 활성화됨 (0개면 비활성 + tooltip: "번역을 먼저 진행하세요").
 
 ---
 
