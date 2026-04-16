@@ -138,6 +138,7 @@ export function TranslatorApp({ token }: { token: string }) {
   const [totalPages, setTotalPages] = useState(0);
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState(1);
+  const [includeAnnotations, setIncludeAnnotations] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [pdfError, setPdfError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -179,11 +180,31 @@ export function TranslatorApp({ token }: { token: string }) {
 
       for (let i = sPage; i <= ePage; i++) {
         const page = await pdf.getPage(i);
+        
+        // Extract Body Text
         const textContent = await page.getTextContent();
         const pageText = textContent.items
           .map((item: any) => item.str)
           .join(' ');
-        extractedText += `--- Page ${i} ---\n` + pageText + '\n\n';
+        
+        extractedText += `--- Page ${i} Body ---\n` + pageText.trim() + '\n\n';
+
+        // Extract Annotations if requested
+        if (includeAnnotations) {
+          const annotations = await page.getAnnotations();
+          const validAnnos = annotations
+            .filter((anno: any) => anno.subtype === 'Text' || anno.subtype === 'FreeText')
+            .map((anno: any) => {
+              const content = anno.contents || '';
+              const title = anno.title ? `[${anno.title}]: ` : '';
+              return title + content;
+            })
+            .filter((content: string) => content.trim().length > 0);
+
+          if (validAnnos.length > 0) {
+            extractedText += `--- Page ${i} Annotations ---\n` + validAnnos.join('\n') + '\n\n';
+          }
+        }
       }
 
       setRawInput(extractedText.trim());
@@ -436,6 +457,18 @@ export function TranslatorApp({ token }: { token: string }) {
                       placeholder="End"
                     />
                   </div>
+                </div>
+
+                <div className="flex items-center gap-4 mt-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeAnnotations}
+                      onChange={(e) => setIncludeAnnotations(e.target.checked)}
+                      className="w-4 height-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Include Annotations
+                  </label>
                 </div>
 
                 <button
