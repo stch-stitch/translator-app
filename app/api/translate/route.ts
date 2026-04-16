@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { Agent } from 'undici';
+import { fetch as undiciFetch, Agent } from 'undici';
 
 const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma4:26b';
@@ -43,11 +43,10 @@ Korean Translation:`;
 
     console.log(`Connecting to: ${ollamaUrl}`);
 
-    const ollamaResponse = await fetch(ollamaUrl, {
+    const ollamaResponse = await undiciFetch(ollamaUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: true, think }),
-      // @ts-expect-error -- undici dispatcher: TLS bypass for self-signed certs (ngrok/Funnel)
       dispatcher: tlsDispatcher,
     }).catch((err: Error) => {
       const cause = (err as Error & { cause?: Error & { code?: string } }).cause;
@@ -61,7 +60,7 @@ Korean Translation:`;
     }
 
     const encoder = new TextEncoder();
-    const stream = ollamaResponse.body.pipeThrough(
+    const stream = (ollamaResponse.body as ReadableStream<Uint8Array>).pipeThrough(
       new TransformStream<Uint8Array, Uint8Array>({
         transform(chunk, controller) {
           const lines = new TextDecoder().decode(chunk).split('\n');
