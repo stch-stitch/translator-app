@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import axios from 'axios';
-import https from 'https';
+import { Agent } from 'undici';
 
 const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma4:26b';
+
+const tlsDispatcher = new Agent({ connect: { rejectUnauthorized: false } });
 
 export async function POST(req: Request): Promise<Response> {
   try {
@@ -38,68 +39,51 @@ ${text}
 Korean Translation:`;
 
     const baseUrl = OLLAMA_API_URL.endsWith('/') ? OLLAMA_API_URL.slice(0, -1) : OLLAMA_API_URL;
-    
-    console.log(`Axios (TLS bypass) attempting connection to: ${baseUrl}/api/generate`);
+    const ollamaUrl = `${baseUrl}/api/generate`;
 
-    const response = await axios({
-      method: 'post',
-      url: `${baseUrl}/api/generate`,
-      data: { 
-        model: OLLAMA_MODEL, 
-        prompt, 
-        stream: true,
-        think: think 
-      },
-      responseType: 'stream',
-      timeout: 60000,
-      // Fix for TLS/SSL connection resets between Vercel and Funnel
-      httpsAgent: new https.Agent({
-        rejectUnauthorized: false
-      }),
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Content-Type': 'application/json'
-      }
-    }).catch(err => {
-      console.error('Axios TLS Error Details:', {
-        message: err.message,
-        code: err.code,
-        cause: err.cause?.message || 'Unknown cause'
-      });
-      
-      throw new Error(`Connection error: ${err.message}. Code: ${err.code || 'N/A'}. ${err.cause?.message || ''}`);
+    console.log(`Connecting to: ${ollamaUrl}`);
+
+    const ollamaResponse = await fetch(ollamaUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: true, think }),
+      // @ts-expect-error -- undici dispatcher: TLS bypass for self-signed certs (ngrok/Funnel)
+      dispatcher: tlsDispatcher,
+    }).catch((err: Error) => {
+      console.error('Fetch error:', { message: err.message, cause: (err as NodeJS.ErrnoException).code });
+      throw new Error(`Connection error: ${err.message}`);
     });
 
+    if (!ollamaResponse.ok || !ollamaResponse.body) {
+      throw new Error(`Ollama responded with status ${ollamaResponse.status}`);
+    }
+
     const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        response.data.on('data', (chunk: Buffer) => {
-          const lines = chunk.toString().split('\n');
+    const stream = ollamaResponse.body.pipeThrough(
+      new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, controller) {
+          const lines = new TextDecoder().decode(chunk).split('\n');
           for (const line of lines) {
             if (!line.trim()) continue;
             try {
-              const json = JSON.parse(line);
+              const json = JSON.parse(line) as { response?: string };
               if (json.response) {
                 controller.enqueue(encoder.encode(json.response));
               }
             } catch { /* ignore partial JSON */ }
           }
-        });
-        response.data.on('end', () => controller.close());
-        response.data.on('error', (err: Error) => controller.error(err));
-      }
-    });
+        },
+      })
+    );
 
     return new Response(stream, {
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });
-  } catch (error: any) {
-    console.error('Translate API Critical Error:', error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal Server Error';
+    console.error('Translate API error:', message);
     return NextResponse.json(
-      { 
-        error: error.message || 'Internal Server Error',
-        details: 'Check Vercel logs for more info.' 
-      },
+      { error: message, details: 'Check Vercel logs for more info.' },
       { status: 500 }
     );
   }
