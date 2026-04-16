@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
+import https from 'https';
 
 const OLLAMA_API_URL = process.env.OLLAMA_API_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma4:26b';
@@ -38,7 +39,7 @@ Korean Translation:`;
 
     const baseUrl = OLLAMA_API_URL.endsWith('/') ? OLLAMA_API_URL.slice(0, -1) : OLLAMA_API_URL;
     
-    console.log(`Axios attempting connection to: ${baseUrl}/api/generate`);
+    console.log(`Axios (TLS bypass) attempting connection to: ${baseUrl}/api/generate`);
 
     const response = await axios({
       method: 'post',
@@ -51,12 +52,16 @@ Korean Translation:`;
       },
       responseType: 'stream',
       timeout: 60000,
+      // Fix for TLS/SSL connection resets between Vercel and Funnel
+      httpsAgent: new https.Agent({
+        rejectUnauthorized: false
+      }),
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Content-Type': 'application/json'
       }
     }).catch(err => {
-      console.error('Axios Error Details:', {
+      console.error('Axios TLS Error Details:', {
         message: err.message,
         code: err.code,
         cause: err.cause?.message || 'Unknown cause'
