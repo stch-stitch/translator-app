@@ -50,8 +50,10 @@ Korean Translation:`;
       // @ts-expect-error -- undici dispatcher: TLS bypass for self-signed certs (ngrok/Funnel)
       dispatcher: tlsDispatcher,
     }).catch((err: Error) => {
-      console.error('Fetch error:', { message: err.message, cause: (err as NodeJS.ErrnoException).code });
-      throw new Error(`Connection error: ${err.message}`);
+      const cause = (err as Error & { cause?: Error & { code?: string } }).cause;
+      const causeInfo = cause ? `${cause.code ?? ''} ${cause.message ?? ''}`.trim() : 'no cause';
+      console.error('Fetch error:', { message: err.message, cause: causeInfo });
+      throw new Error(`Connection error: ${err.message} — ${causeInfo}`);
     });
 
     if (!ollamaResponse.ok || !ollamaResponse.body) {
