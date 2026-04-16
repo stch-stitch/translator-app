@@ -13,7 +13,7 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
-  const { text, instructions } = await req.json();
+  const { text, instructions, think = false } = await req.json();
 
   if (!text || typeof text !== 'string') {
     return NextResponse.json({ error: 'Text is required' }, { status: 400 });
@@ -37,7 +37,7 @@ Korean Translation:`;
   const ollamaRes = await fetch(`${OLLAMA_API_URL}/api/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: true, think: false }),
+    body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: true, think }),
   });
 
   if (!ollamaRes.ok || !ollamaRes.body) {
