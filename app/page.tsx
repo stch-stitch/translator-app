@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Use UNPKG CDN for worker (matching the version in package.json)
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.6.205/build/pdf.worker.min.mjs`;
 
 type SegmentStatus = 'pending' | 'translating' | 'done' | 'error';
 
@@ -102,7 +106,7 @@ function PasswordGate({ onAuth }: { onAuth: (token: string) => void }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="비밀번호를 입력하세요"
-            className="w-full px-4 py-3 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full px-4 py-3 border rounded-lg text-sm text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
             autoFocus
           />
           {error && <p className="text-sm text-red-500">{error}</p>}
@@ -128,6 +132,67 @@ function TranslatorApp({ token }: { token: string }) {
   const [isTranslating, setIsTranslating] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  // PDF related states
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [totalPages, setTotalPages] = useState(0);
+  const [startPage, setStartPage] = useState(1);
+  const [endPage, setEndPage] = useState(1);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [pdfError, setPdfError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type === 'application/pdf') {
+      setPdfFile(file);
+      setPdfError('');
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+        setTotalPages(pdf.numPages);
+        setEndPage(pdf.numPages);
+        setStartPage(1);
+      } catch (err: any) {
+        setPdfError('Failed to load PDF: ' + err.message);
+      }
+    } else if (file) {
+      setPdfError('Please upload a valid PDF file.');
+    }
+  };
+
+  const handleExtractText = async () => {
+    if (!pdfFile) return;
+
+    setIsExtracting(true);
+    setPdfError('');
+    let extractedText = '';
+
+    try {
+      const arrayBuffer = await pdfFile.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+
+      const sPage = Math.max(1, startPage);
+      const ePage = Math.min(pdf.numPages, endPage);
+
+      for (let i = sPage; i <= ePage; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+        extractedText += `--- Page ${i} ---\n` + pageText + '\n\n';
+      }
+
+      setRawInput(extractedText.trim());
+    } catch (err: any) {
+      setPdfError('Failed to extract text: ' + err.message);
+    } finally {
+      setIsExtracting(false);
+    }
+  };
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -321,6 +386,67 @@ function TranslatorApp({ token }: { token: string }) {
           />
         </div>
 
+        {/* PDF Upload Section */}
+        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-sm">PDF</span>
+              Document Translation
+            </h2>
+          </div>
+          
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="flex-1 min-w-[200px] space-y-2">
+              <label className="text-sm font-medium text-gray-700">Select PDF File</label>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="application/pdf"
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+              />
+            </div>
+
+            {pdfFile && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Range (Total: {totalPages})</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalPages}
+                      value={startPage}
+                      onChange={(e) => setStartPage(Number(e.target.value))}
+                      className="w-20 p-2 border rounded text-sm outline-none focus:ring-1 focus:ring-blue-500"
+                      placeholder="Start"
+                    />
+                    <span className="text-gray-400">~</span>
+                    <input
+                      type="number"
+                      min={startPage}
+                      max={totalPages}
+                      value={endPage}
+                      onChange={(e) => setEndPage(Number(e.target.value))}
+                      className="w-20 p-2 border rounded text-sm outline-none focus:ring-1 focus:ring-blue-500"
+                      placeholder="End"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleExtractText}
+                  disabled={isExtracting}
+                  className="px-6 py-2 bg-blue-100 text-blue-700 rounded-lg font-semibold hover:bg-blue-200 disabled:opacity-50 transition-colors"
+                >
+                  {isExtracting ? 'Extracting...' : 'Extract Text'}
+                </button>
+              </>
+            )}
+          </div>
+          {pdfError && <p className="text-sm text-red-500">{pdfError}</p>}
+        </section>
+
         <div className="flex flex-col space-y-2">
           <label className="font-semibold">English Text</label>
           <textarea
@@ -379,18 +505,31 @@ function TranslatorApp({ token }: { token: string }) {
                 {seg.status !== 'translating' && (
                   <button
                     onClick={() => handleDeleteSegment(seg.id)}
-                    className="absolute top-3 right-3 text-gray-300 hover:text-red-500 transition-colors leading-none"
+                    className="absolute bottom-3 right-3 text-red-400 hover:text-red-600 transition-colors flex items-center gap-1 text-xs font-medium"
                     aria-label="Delete paragraph"
                   >
-                    ✕
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                    Delete
                   </button>
                 )}
                 <div className="pr-6">
                   <p className="text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">English</p>
                   <p className="text-sm whitespace-pre-wrap">{seg.english}</p>
                 </div>
-                <div>
+                <div className="relative">
                   <p className="text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">Korean</p>
+                  {seg.status === 'done' && seg.korean && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(seg.korean || '');
+                        // Optional: trigger some visual feedback here
+                      }}
+                      className="absolute -top-1 right-0 text-gray-300 hover:text-blue-500 transition-colors p-1"
+                      title="Copy to clipboard"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
+                  )}
                   {seg.status === 'pending' && <p className="text-sm text-gray-300">—</p>}
                   {seg.status === 'translating' && <p className="text-sm text-gray-400 animate-pulse">Translating...</p>}
                   {seg.status === 'done' && <p className="text-sm whitespace-pre-wrap">{seg.korean}</p>}
@@ -412,10 +551,11 @@ function TranslatorApp({ token }: { token: string }) {
                   </span>
                   <button
                     onClick={() => handleDeleteHistory(entry.id)}
-                    className="text-gray-300 hover:text-red-500 transition-colors text-lg leading-none"
+                    className="text-red-400 hover:text-red-600 transition-colors flex items-center gap-1 text-xs font-medium"
                     aria-label="Delete entry"
                   >
-                    ✕
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                    Delete
                   </button>
                 </div>
                 <div className="divide-y">
@@ -425,8 +565,19 @@ function TranslatorApp({ token }: { token: string }) {
                         <p className="text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">English</p>
                         <p className="text-sm whitespace-pre-wrap">{seg.english}</p>
                       </div>
-                      <div>
+                      <div className="relative">
                         <p className="text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">Korean</p>
+                        {seg.korean && (
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(seg.korean || '');
+                            }}
+                            className="absolute -top-1 right-0 text-gray-300 hover:text-blue-500 transition-colors p-1"
+                            title="Copy to clipboard"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                          </button>
+                        )}
                         <p className="text-sm whitespace-pre-wrap">{seg.korean ?? '—'}</p>
                       </div>
                     </div>
