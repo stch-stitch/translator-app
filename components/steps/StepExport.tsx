@@ -1,0 +1,153 @@
+// components/steps/StepExport.tsx
+'use client';
+
+import { useState } from 'react';
+import type { ParagraphSegment, HistoryEntry } from '@/types/translator';
+
+interface StepExportProps {
+  segments: ParagraphSegment[];
+  history: HistoryEntry[];
+  onDeleteHistory: (id: number) => void;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleString('ko-KR', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+export function StepExport({ segments, history, onDeleteHistory }: StepExportProps) {
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'copiedBi'>('idle');
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const doneSegments = segments.filter(s => s.status === 'done' && s.korean);
+  const koreanText = doneSegments.map(s => s.korean ?? '').join('\n\n');
+  const bilingualText = doneSegments
+    .map(s => `${s.english}\n\n${s.korean ?? ''}`)
+    .join('\n\n---\n\n');
+
+  const handleCopyKorean = async (): Promise<void> => {
+    await navigator.clipboard.writeText(koreanText);
+    setCopyState('copied');
+    setTimeout(() => setCopyState('idle'), 2000);
+  };
+
+  const handleDownload = (): void => {
+    const blob = new Blob([koreanText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const ts = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+    a.href = url;
+    a.download = `translated_${ts}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyBilingual = async (): Promise<void> => {
+    await navigator.clipboard.writeText(bilingualText);
+    setCopyState('copiedBi');
+    setTimeout(() => setCopyState('idle'), 2000);
+  };
+
+  if (doneSegments.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-400 dark:text-slate-600">
+        <p className="text-4xl mb-3">📭</p>
+        <p className="text-sm">번역된 단락이 없습니다.</p>
+        <p className="text-xs mt-1">② 번역 탭에서 번역을 먼저 진행하세요.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* 내보내기 버튼 */}
+      <div className="flex gap-3">
+        <button
+          onClick={handleCopyKorean}
+          className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
+            copyState === 'copied'
+              ? 'bg-green-600 text-white'
+              : 'bg-green-500 hover:bg-green-600 text-white'
+          }`}
+        >
+          {copyState === 'copied' ? '✓ 복사됨!' : '📋 한국어 전체 복사'}
+        </button>
+        <button
+          onClick={handleDownload}
+          className="flex-1 py-3 rounded-xl font-semibold text-sm transition-colors
+            border border-slate-200 text-slate-600 hover:bg-slate-50
+            dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          ⬇ .txt 다운로드
+        </button>
+        <button
+          onClick={handleCopyBilingual}
+          className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-all
+            border ${copyState === 'copiedBi'
+              ? 'border-green-500 text-green-600 dark:text-green-400'
+              : 'border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
+        >
+          {copyState === 'copiedBi' ? '✓ 복사됨!' : '원문+번역 대조본'}
+        </button>
+      </div>
+
+      {/* 미리보기 */}
+      <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="px-4 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            미리보기 (한국어 · {doneSegments.length}단락)
+          </span>
+        </div>
+        <div className="p-4 max-h-64 overflow-y-auto">
+          <p className="text-sm whitespace-pre-wrap text-slate-700 dark:text-slate-300 leading-relaxed">
+            {koreanText}
+          </p>
+        </div>
+      </div>
+
+      {/* 히스토리 (접었다 펼치기) */}
+      {history.length > 0 && (
+        <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+          <button
+            onClick={() => setHistoryOpen(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold
+              bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750"
+          >
+            <span>번역 히스토리 ({history.length}건)</span>
+            <span className="text-slate-400">{historyOpen ? '▲' : '▼'}</span>
+          </button>
+          {historyOpen && (
+            <div className="divide-y divide-slate-200 dark:divide-slate-700">
+              {history.map(entry => (
+                <div key={entry.id} className="overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2 bg-slate-50/50 dark:bg-slate-800/50">
+                    <span className="text-xs text-slate-400">
+                      {formatDate(entry.translatedAt)} · {entry.segments.length}단락
+                    </span>
+                    <button
+                      onClick={() => onDeleteHistory(entry.id)}
+                      className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {entry.segments.map(seg => (
+                      <div key={seg.id} className="grid grid-cols-2 gap-4 px-4 py-3">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 whitespace-pre-wrap">{seg.english}</p>
+                        <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{seg.korean ?? '—'}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
