@@ -24,7 +24,7 @@ export interface HistoryEntry {
 const STORAGE_KEY = 'translator-history';
 const INSTRUCTIONS_KEY = 'translator-instructions';
 const DEFAULT_INSTRUCTIONS =
-  '단 하나의 문장도 빠짐 없이 번역을 진행해줘. 너의 다른 상식을 섞지 말고 번역 의뢰한 문장을 번역하는데만 집중해.';
+  '하나의 문장도 빠짐 없이 번역을 진행해. 다른 상식 섞지 말고 번역 의뢰한 문장을 번역하는데만 집중해. 제목으로 판단되는 문장 다음에는 줄바꿈을 해.';
 
 function loadHistory(): HistoryEntry[] {
   try {
@@ -467,7 +467,7 @@ export function TranslatorApp({ token }: { token: string }) {
                       onChange={(e) => setIncludeAnnotations(e.target.checked)}
                       className="w-4 height-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
-                    Include Annotations
+                    주석 포함
                   </label>
                 </div>
 
