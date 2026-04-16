@@ -398,7 +398,7 @@ export function TranslatorApp({ token }: { token: string }) {
         </header>
 
         <div className="flex flex-col space-y-2">
-          <label className="font-semibold">Translation Instructions</label>
+          <label className="font-semibold">Translation Rules</label>
           <textarea
             className="w-full h-14 py-3 px-4 border rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-blue-50 text-sm leading-tight"
             value={instructions}
