@@ -37,18 +37,29 @@ Korean Translation:`;
 
     const baseUrl = OLLAMA_API_URL.endsWith('/') ? OLLAMA_API_URL.slice(0, -1) : OLLAMA_API_URL;
     
+    console.log(`Attempting to fetch from Ollama: ${baseUrl}/api/generate`);
+
     const ollamaRes = await fetch(`${baseUrl}/api/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        // Add User-Agent to mimic a real browser request, preventing some proxy blocks
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
       body: JSON.stringify({ 
         model: OLLAMA_MODEL, 
         prompt, 
         stream: true,
         think: think 
       }),
+      // Set a reasonable timeout for the connection phase
+      signal: AbortSignal.timeout(30000) 
     }).catch(err => {
-      console.error('Fetch to Ollama failed:', err);
-      throw new Error(`Failed to reach Ollama at ${OLLAMA_API_URL}: ${err.message}`);
+      console.error('CRITICAL: Fetch to Ollama failed:', err.name, err.message);
+      if (err.name === 'TimeoutError') {
+        throw new Error(`Connection to Ollama timed out at ${baseUrl}. Is the server awake?`);
+      }
+      throw new Error(`Network error reaching Ollama: ${err.message}. Check if Funnel is public.`);
     });
 
     if (!ollamaRes.ok) {
