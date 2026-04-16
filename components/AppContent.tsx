@@ -13,6 +13,7 @@ export interface ParagraphSegment {
   english: string;
   korean: string | null;
   status: SegmentStatus;
+  errorMsg?: string;
 }
 
 export interface HistoryEntry {
@@ -280,7 +281,10 @@ export function TranslatorApp({ token }: { token: string }) {
 
     if (!response.ok || !response.body) {
       const data = await response.json().catch(() => ({}));
-      throw new Error(typeof data.error === 'string' ? data.error : 'Translation failed');
+      const msg = data.error 
+        ? `${data.error}${data.details ? `: ${data.details}` : ''}` 
+        : 'Translation failed';
+      throw new Error(msg);
     }
 
     const reader = response.body.getReader();
@@ -321,12 +325,17 @@ export function TranslatorApp({ token }: { token: string }) {
           controller.signal
         );
         patchSegments((prev) =>
-          prev.map((s) => (s.id === seg.id ? { ...s, korean, status: 'done' } : s))
+          prev.map((s) => (s.id === seg.id ? { ...s, korean, status: 'done', errorMsg: undefined } : s))
         );
-      } catch (err) {
+      } catch (err: any) {
         const isAbort = err instanceof DOMException && err.name === 'AbortError';
         patchSegments((prev) =>
-          prev.map((s) => (s.id === seg.id ? { ...s, korean: null, status: isAbort ? 'pending' : 'error' } : s))
+          prev.map((s) => (s.id === seg.id ? { 
+            ...s, 
+            korean: null, 
+            status: isAbort ? 'pending' : 'error',
+            errorMsg: isAbort ? undefined : err.message
+          } : s))
         );
         if (isAbort) break;
       }
@@ -583,7 +592,12 @@ export function TranslatorApp({ token }: { token: string }) {
                   {seg.status === 'pending' && <p className="text-sm text-gray-300">—</p>}
                   {seg.status === 'translating' && <p className="text-sm text-gray-400 animate-pulse">Translating...</p>}
                   {seg.status === 'done' && <p className="text-sm whitespace-pre-wrap">{seg.korean}</p>}
-                  {seg.status === 'error' && <p className="text-sm text-red-400">Translation failed — will retry on Resume</p>}
+                  {seg.status === 'error' && (
+                    <div className="mt-1">
+                      <p className="text-sm text-red-400">Translation failed — will retry on Resume</p>
+                      {seg.errorMsg && <p className="text-xs text-red-300 mt-1">{seg.errorMsg}</p>}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

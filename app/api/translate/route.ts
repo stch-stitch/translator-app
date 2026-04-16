@@ -35,7 +35,9 @@ ${text}
 
 Korean Translation:`;
 
-    const ollamaRes = await fetch(`${OLLAMA_API_URL}/api/generate`, {
+    const baseUrl = OLLAMA_API_URL.endsWith('/') ? OLLAMA_API_URL.slice(0, -1) : OLLAMA_API_URL;
+    
+    const ollamaRes = await fetch(`${baseUrl}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -44,15 +46,26 @@ Korean Translation:`;
         stream: true,
         think: think 
       }),
+    }).catch(err => {
+      console.error('Fetch to Ollama failed:', err);
+      throw new Error(`Failed to reach Ollama at ${OLLAMA_API_URL}: ${err.message}`);
     });
 
-    if (!ollamaRes.ok || !ollamaRes.body) {
+    if (!ollamaRes.ok) {
       const errorText = await ollamaRes.text().catch(() => 'No error body');
       console.error('Ollama API Error:', ollamaRes.status, errorText);
       return NextResponse.json(
-        { error: `Ollama error (${ollamaRes.status}): Failed to communicate with Ollama.` },
+        { 
+          error: `Ollama error (${ollamaRes.status})`, 
+          details: errorText,
+          url: `${OLLAMA_API_URL}/api/generate`
+        },
         { status: 500 }
       );
+    }
+
+    if (!ollamaRes.body) {
+      throw new Error('Ollama response body is empty');
     }
 
     const encoder = new TextEncoder();
