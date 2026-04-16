@@ -465,18 +465,15 @@ export function TranslatorApp({ token }: { token: string }) {
         <div className="flex justify-center items-center gap-3">
           <button
             onClick={() => setIsThink(!isThink)}
-            className={`p-3 rounded-full transition-all duration-200 ${
+            className={`px-4 py-3 rounded-full transition-all duration-300 text-sm font-bold ${
               isThink 
-                ? 'bg-purple-100 text-purple-600 shadow-inner' 
-                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                ? 'bg-purple-600 text-white shadow-md ring-2 ring-purple-300 ring-opacity-50' 
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
             }`}
             title={isThink ? "Thinking Mode: ON (Deep Reasoning)" : "Thinking Mode: OFF"}
             disabled={isTranslating}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.54Z"/>
-              <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.54Z"/>
-            </svg>
+            사고력 강화
           </button>
 
           <button
