@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Translator for my wife",
+  title: "Translator for my Yf",
   description: "English to Korean translator powered by local LLM",
 };
 

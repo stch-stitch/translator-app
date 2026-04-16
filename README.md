@@ -1,4 +1,4 @@
-# Translator for my wife
+# Translator for my Yf
 
 Ollama 로컬 LLM을 사용한 영한 번역 앱입니다. 긴 텍스트를 문단 단위로 분절하여 순차적으로 번역합니다.
 

@@ -95,9 +95,9 @@ export function PasswordGate({ onAuth }: { onAuth: (token: string) => void }) {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm p-8 bg-white border rounded-xl shadow-sm space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-blue-600">Translator for my wife</h1>
-          <p className="text-sm text-gray-400 mt-1">by Hb</p>
+        <div className="flex items-baseline gap-2 mb-1">
+          <h1 className="text-2xl font-bold text-blue-600">Translator for my Yf</h1>
+          <span className="text-sm text-gray-400">by Hb</span>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
@@ -392,9 +392,9 @@ export function TranslatorApp({ token }: { token: string }) {
   return (
     <main className="min-h-screen p-8 bg-gray-50 text-gray-900">
       <div className="max-w-4xl mx-auto space-y-6">
-        <header>
-          <h1 className="text-3xl font-bold text-blue-600">Translator for my wife</h1>
-          <p className="text-gray-500">by Hb</p>
+        <header className="flex items-baseline gap-2">
+          <h1 className="text-3xl font-bold text-blue-600">Translator for my Yf</h1>
+          <span className="text-gray-500">by Hb</span>
         </header>
 
         <div className="flex flex-col space-y-2">
