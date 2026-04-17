@@ -4,27 +4,10 @@
 import { useState, useRef, useCallback, useLayoutEffect } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { detectNoise, applyNoiseFilter, DEFAULT_NOISE_CONFIG } from '@/lib/noiseFilter';
+import { extractParagraphs, type PdfTextItem } from '@/lib/pdfParagraphExtractor';
 import type { NoiseFilterConfig } from '@/types/translator';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.6.205/build/pdf.worker.min.mjs`;
-
-interface PdfTextItem {
-  str: string;
-  transform: number[];
-  width: number;
-  height: number;
-  fontName: string;
-  hasEOL: boolean;
-}
-
-function computeFootnoteThreshold(items: PdfTextItem[]): number {
-  const heights = items
-    .filter(item => item.str.trim().length > 0 && item.height > 0)
-    .map(item => item.height);
-  if (heights.length === 0) return 0;
-  const sorted = [...heights].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)] * 0.75;
-}
 
 interface StepPdfCleanProps {
   isTranslating: boolean;
@@ -96,41 +79,45 @@ export function StepPdfClean({ isTranslating, isThink, instructions, onToggleThi
     if (!pdfFile) return;
     setIsExtracting(true);
     setPdfError('');
-    let extracted = '';
     try {
       const buf = await pdfFile.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
       const sPage = Math.max(1, startPage);
       const ePage = Math.min(pdf.numPages, endPage);
-      for (let i = sPage; i <= ePage; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
 
-        const typedItems = textContent.items as PdfTextItem[];
-        const viewport = page.getViewport({ scale: 1 });
-        const heightThreshold = !includeFootnotes ? computeFootnoteThreshold(typedItems) : 0;
-        const posThreshold = !includeFootnotes ? viewport.height * 0.15 : 0;
+      // 각 페이지의 TextItem과 viewport 정보를 수집
+      const pageInputs = await Promise.all(
+        Array.from({ length: ePage - sPage + 1 }, async (_, idx) => {
+          const page = await pdf.getPage(sPage + idx);
+          const textContent = await page.getTextContent();
+          const viewport = page.getViewport({ scale: 1 });
+          return {
+            items: textContent.items as PdfTextItem[],
+            viewportHeight: viewport.height,
+            includeFootnotes,
+          };
+        })
+      );
 
-        const visibleItems = !includeFootnotes
-          ? typedItems.filter(item => {
-              if (item.height > 0 && item.height < heightThreshold) return false;
-              if (item.transform[5] < posThreshold) return false;
-              return true;
-            })
-          : typedItems;
+      // 문단 단위 추출
+      const paragraphs = extractParagraphs(pageInputs);
 
-        const pageText = visibleItems.map(item => item.str).join(' ');
-        extracted += pageText.trim() + '\n\n';
-        if (includeAnnotations) {
+      // PDF annotation(팝업 메모) 추가
+      if (includeAnnotations) {
+        for (let i = sPage; i <= ePage; i++) {
+          const page = await pdf.getPage(i);
           const annotations = await page.getAnnotations();
           const annos = annotations
             .filter((a: { subtype: string }) => a.subtype === 'Text' || a.subtype === 'FreeText')
-            .map((a: { contents?: string; title?: string }) => (a.title ? `[${a.title}]: ` : '') + (a.contents ?? ''))
+            .map((a: { contents?: string; title?: string }) =>
+              (a.title ? `[${a.title}]: ` : '') + (a.contents ?? '')
+            )
             .filter((s: string) => s.trim().length > 0);
-          if (annos.length > 0) extracted += annos.join('\n') + '\n\n';
+          if (annos.length > 0) paragraphs.push(...annos);
         }
       }
-      const text = extracted.trim();
+
+      const text = paragraphs.join('\n\n').trim();
       setRawText(text);
       setDetectedNoise(detectNoise(text));
     } catch (err: unknown) {
