@@ -8,6 +8,24 @@ import type { NoiseFilterConfig } from '@/types/translator';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.6.205/build/pdf.worker.min.mjs`;
 
+interface PdfTextItem {
+  str: string;
+  transform: number[];
+  width: number;
+  height: number;
+  fontName: string;
+  hasEOL: boolean;
+}
+
+function computeFootnoteThreshold(items: PdfTextItem[]): number {
+  const heights = items
+    .filter(item => item.str.trim().length > 0 && item.height > 0)
+    .map(item => item.height);
+  if (heights.length === 0) return 0;
+  const sorted = [...heights].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)] * 0.75;
+}
+
 interface StepPdfCleanProps {
   isTranslating: boolean;
   isThink: boolean;
@@ -24,6 +42,7 @@ export function StepPdfClean({ isTranslating, isThink, instructions, onToggleThi
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState(1);
   const [includeAnnotations, setIncludeAnnotations] = useState(false);
+  const [excludeFootnotes, setExcludeFootnotes] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [pdfError, setPdfError] = useState('');
   const [noiseConfig, setNoiseConfig] = useState<NoiseFilterConfig>(DEFAULT_NOISE_CONFIG);
@@ -86,7 +105,21 @@ export function StepPdfClean({ isTranslating, isThink, instructions, onToggleThi
       for (let i = sPage; i <= ePage; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        const pageText = (textContent.items as Array<{ str: string }>).map(item => item.str).join(' ');
+
+        const typedItems = textContent.items as PdfTextItem[];
+        const viewport = page.getViewport({ scale: 1 });
+        const heightThreshold = excludeFootnotes ? computeFootnoteThreshold(typedItems) : 0;
+        const posThreshold = excludeFootnotes ? viewport.height * 0.15 : 0;
+
+        const visibleItems = excludeFootnotes
+          ? typedItems.filter(item => {
+              if (item.height > 0 && item.height < heightThreshold) return false;
+              if (item.transform[5] < posThreshold) return false;
+              return true;
+            })
+          : typedItems;
+
+        const pageText = visibleItems.map(item => item.str).join(' ');
         extracted += pageText.trim() + '\n\n';
         if (includeAnnotations) {
           const annotations = await page.getAnnotations();
@@ -168,7 +201,15 @@ export function StepPdfClean({ isTranslating, isThink, instructions, onToggleThi
               onChange={e => setIncludeAnnotations(e.target.checked)}
               className="rounded"
             />
-            주석 포함
+            팝업 메모 포함
+          </label>
+          <label className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 cursor-pointer">
+            <input
+              type="checkbox" checked={excludeFootnotes}
+              onChange={e => setExcludeFootnotes(e.target.checked)}
+              className="rounded"
+            />
+            각주 제외
           </label>
           <button
             onClick={handleExtract}
