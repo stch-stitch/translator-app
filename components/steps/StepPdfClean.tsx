@@ -5,11 +5,12 @@ import { useState, useRef, useCallback, useLayoutEffect } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { detectNoise, applyNoiseFilter, DEFAULT_NOISE_CONFIG } from '@/lib/noiseFilter';
 import { extractParagraphs, type PdfTextItem } from '@/lib/pdfParagraphExtractor';
-import type { NoiseFilterConfig } from '@/types/translator';
+import type { NoiseFilterConfig, ParsedSegment } from '@/types/translator';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.6.205/build/pdf.worker.min.mjs`;
 
 interface StepPdfCleanProps {
+  token: string;
   isTranslating: boolean;
   isThink: boolean;
   instructions: string;
@@ -18,7 +19,7 @@ interface StepPdfCleanProps {
   onStartTranslation: (text: string) => void;
 }
 
-export function StepPdfClean({ isTranslating, isThink, instructions, onToggleThink, onInstructionsChange, onStartTranslation }: StepPdfCleanProps) {
+export function StepPdfClean({ token, isTranslating, isThink, instructions, onToggleThink, onInstructionsChange, onStartTranslation }: StepPdfCleanProps) {
   const [rawText, setRawText] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [totalPages, setTotalPages] = useState(0);
@@ -30,6 +31,9 @@ export function StepPdfClean({ isTranslating, isThink, instructions, onToggleThi
   const [pdfError, setPdfError] = useState('');
   const [noiseConfig, setNoiseConfig] = useState<NoiseFilterConfig>(DEFAULT_NOISE_CONFIG);
   const [detectedNoise, setDetectedNoise] = useState<{ pageNumbers: number; runningHeaders: number; figureCaptions: number } | null>(null);
+  const [parsedSegments, setParsedSegments] = useState<ParsedSegment[]>([]);
+  const [isParsing, setIsParsing] = useState(false);
+  const [parseError, setParseError] = useState('');
   const instructionsRef = useRef<HTMLTextAreaElement>(null);
   const INSTRUCTIONS_MIN_PX = 55;
 
@@ -127,13 +131,47 @@ export function StepPdfClean({ isTranslating, isThink, instructions, onToggleThi
     }
   };
 
+  const handleAIParse = async (): Promise<void> => {
+    const text = rawText ? filteredText : '';
+    if (!text.trim()) return;
+    setIsParsing(true);
+    setParseError('');
+    try {
+      const res = await fetch('/api/parse-structure', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json() as { segments?: ParsedSegment[]; error?: string; details?: string };
+      if (!res.ok || !data.segments) {
+        setParseError(data.error ? `${data.error}${data.details ? `: ${data.details}` : ''}` : 'AI 파싱 실패');
+        return;
+      }
+      setParsedSegments(data.segments);
+    } catch (err: unknown) {
+      setParseError('AI 파싱 실패: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
   const handleStart = (): void => {
+    if (parsedSegments.length > 0) {
+      const text = parsedSegments.map(s => s.text).join('\n\n');
+      onStartTranslation(text);
+      return;
+    }
     const text = rawText ? filteredText : '';
     if (!text.trim()) return;
     onStartTranslation(text);
   };
 
-  const textToTranslate = rawText ? filteredText : '';
+  const textToTranslate = parsedSegments.length > 0
+    ? parsedSegments.map(s => s.text).join('\n\n')
+    : (rawText ? filteredText : '');
 
   return (
     <div className="space-y-5">
@@ -237,30 +275,9 @@ export function StepPdfClean({ isTranslating, isThink, instructions, onToggleThi
         </div>
       )}
 
-      {/* 텍스트 입력 (수동 또는 추출 결과) */}
-      <div className="space-y-1.5">
-        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-          번역할 텍스트
-          {rawText && detectedNoise && (
-            <span className="ml-2 text-xs font-normal text-slate-400">
-              (필터 적용 후 미리보기)
-            </span>
-          )}
-        </label>
-        <textarea
-          value={rawText ? filteredText : ''}
-          onChange={e => { setRawText(e.target.value); setDetectedNoise(null); }}
-          placeholder="번역할 영어 텍스트를 붙여넣거나 위에서 PDF를 추출하세요.&#10;빈 줄로 구분된 문단을 하나씩 순서대로 번역합니다."
-          disabled={isTranslating}
-          className="w-full h-52 p-4 text-sm border rounded-lg resize-none outline-none
-            border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:border-blue-400
-            dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-600 dark:focus:border-blue-500"
-        />
-      </div>
-
       {pdfError && <p className="text-sm text-red-500">{pdfError}</p>}
 
-      {/* 번역 액션 바 */}
+      {/* 번역 액션 바 — 컨텐츠 위에 위치 */}
       <div className="flex items-center gap-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 overflow-hidden">
         <textarea
           ref={instructionsRef}
@@ -296,6 +313,102 @@ export function StepPdfClean({ isTranslating, isThink, instructions, onToggleThi
           </button>
         </div>
       </div>
+
+      {/* AI 구조 분석 버튼 (텍스트 추출 후, 파싱 전) */}
+      {rawText && parsedSegments.length === 0 && (
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleAIParse}
+            disabled={isParsing || isTranslating}
+            className="px-5 py-2 text-sm font-semibold rounded-lg transition-colors
+              bg-purple-100 text-purple-700 hover:bg-purple-200
+              dark:bg-purple-950 dark:text-purple-300 dark:hover:bg-purple-900
+              disabled:opacity-50"
+          >
+            {isParsing ? 'AI 분석 중…' : '🤖 AI 구조 분석'}
+          </button>
+          <span className="text-xs text-slate-400">
+            Ollama가 제목·문단을 인식하고 텍스트를 정제합니다
+          </span>
+        </div>
+      )}
+
+      {parseError && <p className="text-sm text-red-500">{parseError}</p>}
+
+      {/* 파싱된 세그먼트 카드 목록 */}
+      {parsedSegments.length > 0 ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              번역할 세그먼트
+              <span className="ml-2 text-xs font-normal text-slate-400">
+                ({parsedSegments.length}개)
+              </span>
+            </label>
+            <button
+              onClick={() => setParsedSegments([])}
+              className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            >
+              초기화
+            </button>
+          </div>
+          {parsedSegments.map(seg => (
+            <div
+              key={seg.id}
+              className="flex gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+            >
+              <span
+                className={`shrink-0 mt-0.5 px-2 py-0.5 text-xs font-semibold rounded ${
+                  seg.type === 'title'
+                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                }`}
+              >
+                {seg.type === 'title' ? '제목' : '문단'}
+              </span>
+              <textarea
+                value={seg.text}
+                onChange={e => setParsedSegments(prev =>
+                  prev.map(s => s.id === seg.id ? { ...s, text: e.target.value } : s)
+                )}
+                disabled={isTranslating}
+                rows={seg.type === 'title' ? 1 : 3}
+                className="flex-1 text-sm resize-y outline-none bg-transparent
+                  text-slate-800 dark:text-slate-200 placeholder-slate-400"
+              />
+              <button
+                onClick={() => setParsedSegments(prev => prev.filter(s => s.id !== seg.id))}
+                disabled={isTranslating}
+                className="shrink-0 text-slate-300 hover:text-red-400 dark:text-slate-600 dark:hover:text-red-400 transition-colors disabled:opacity-30"
+                title="세그먼트 삭제"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* 원문 텍스트 영역 (파싱 전 fallback) */
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            번역할 텍스트
+            {rawText && detectedNoise && (
+              <span className="ml-2 text-xs font-normal text-slate-400">
+                (필터 적용 후 미리보기)
+              </span>
+            )}
+          </label>
+          <textarea
+            value={rawText ? filteredText : ''}
+            onChange={e => { setRawText(e.target.value); setDetectedNoise(null); }}
+            placeholder="번역할 영어 텍스트를 붙여넣거나 위에서 PDF를 추출하세요.&#10;빈 줄로 구분된 문단을 하나씩 순서대로 번역합니다."
+            disabled={isTranslating}
+            className="w-full h-52 p-4 text-sm border rounded-lg resize-none outline-none
+              border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:border-blue-400
+              dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-600 dark:focus:border-blue-500"
+          />
+        </div>
+      )}
     </div>
   );
 }

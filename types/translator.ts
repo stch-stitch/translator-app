@@ -29,3 +29,9 @@ export interface NoiseFilterConfig {
   runningHeaders: boolean;   // 짧고 반복되는 줄 (헤더/푸터)
   figureCaptions: boolean;   // Figure N. / Table N. 캡션 줄
 }
+
+export interface ParsedSegment {
+  id: number;
+  type: 'title' | 'paragraph';
+  text: string;
+}

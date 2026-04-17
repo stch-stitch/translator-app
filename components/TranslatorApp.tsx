@@ -380,6 +380,7 @@ export function TranslatorApp({ token, theme, onToggleTheme }: TranslatorAppProp
           <div className="flex-1 min-w-0 p-6">
             {activeStep === 1 && (
               <StepPdfClean
+                token={token}
                 isTranslating={isTranslating}
                 isThink={isThink}
                 instructions={instructions}
