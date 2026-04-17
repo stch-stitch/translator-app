@@ -64,6 +64,7 @@ export function TranslatorApp({ token, theme, onToggleTheme }: TranslatorAppProp
   const [glossary, setGlossary] = useState<GlossaryEntry[]>([]);
   const [instructions, setInstructions] = useState(DEFAULT_INSTRUCTIONS);
   const [isThink, setIsThink] = useState(false);
+  const [ollamaReady, setOllamaReady] = useState<boolean | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -78,6 +79,21 @@ export function TranslatorApp({ token, theme, onToggleTheme }: TranslatorAppProp
   // sync refs
   useEffect(() => { tokenRef.current = token; }, [token]);
   useEffect(() => { isThinkRef.current = isThink; }, [isThink]);
+
+  useEffect(() => {
+    const checkOllama = async (): Promise<void> => {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json() as { ok: boolean };
+        setOllamaReady(data.ok);
+      } catch {
+        setOllamaReady(false);
+      }
+    };
+    void checkOllama();
+    const id = setInterval(() => { void checkOllama(); }, 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const hist = loadHistory();
@@ -312,9 +328,24 @@ export function TranslatorApp({ token, theme, onToggleTheme }: TranslatorAppProp
       <div className="max-w-5xl mx-auto">
         {/* 헤더 */}
         <header className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-baseline gap-2">
-            <h1 className="text-xl font-bold text-blue-600 dark:text-blue-400">Translator for</h1>
-            <span className="text-xs text-slate-400">my Yf by Hb</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-xl font-bold text-blue-600 dark:text-blue-400">Translator for</h1>
+              <span className="text-xs text-slate-400">my Yf by Hb</span>
+            </div>
+            <span
+              className={`w-2 h-2 rounded-full transition-colors ${
+                ollamaReady === null
+                  ? 'bg-slate-300 dark:bg-slate-600 animate-pulse'
+                  : ollamaReady
+                  ? 'bg-green-500'
+                  : 'bg-red-500'
+              }`}
+              title={
+                ollamaReady === null ? 'Ollama 확인 중...' :
+                ollamaReady ? 'Ollama 연결됨' : 'Ollama 오프라인'
+              }
+            />
           </div>
           <DarkModeToggle theme={theme} onToggle={onToggleTheme} />
         </header>
