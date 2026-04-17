@@ -41,8 +41,8 @@ export function StepPdfClean({ isTranslating, isThink, instructions, onToggleThi
   const [totalPages, setTotalPages] = useState(0);
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState(1);
-  const [includeAnnotations, setIncludeAnnotations] = useState(false);
-  const [excludeFootnotes, setExcludeFootnotes] = useState(false);
+  const [includeAnnotations, setIncludeAnnotations] = useState(true);
+  const [includeFootnotes, setIncludeFootnotes] = useState(true);
   const [isExtracting, setIsExtracting] = useState(false);
   const [pdfError, setPdfError] = useState('');
   const [noiseConfig, setNoiseConfig] = useState<NoiseFilterConfig>(DEFAULT_NOISE_CONFIG);
@@ -108,10 +108,10 @@ export function StepPdfClean({ isTranslating, isThink, instructions, onToggleThi
 
         const typedItems = textContent.items as PdfTextItem[];
         const viewport = page.getViewport({ scale: 1 });
-        const heightThreshold = excludeFootnotes ? computeFootnoteThreshold(typedItems) : 0;
-        const posThreshold = excludeFootnotes ? viewport.height * 0.15 : 0;
+        const heightThreshold = !includeFootnotes ? computeFootnoteThreshold(typedItems) : 0;
+        const posThreshold = !includeFootnotes ? viewport.height * 0.15 : 0;
 
-        const visibleItems = excludeFootnotes
+        const visibleItems = !includeFootnotes
           ? typedItems.filter(item => {
               if (item.height > 0 && item.height < heightThreshold) return false;
               if (item.transform[5] < posThreshold) return false;
@@ -205,11 +205,11 @@ export function StepPdfClean({ isTranslating, isThink, instructions, onToggleThi
           </label>
           <label className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 cursor-pointer">
             <input
-              type="checkbox" checked={excludeFootnotes}
-              onChange={e => setExcludeFootnotes(e.target.checked)}
+              type="checkbox" checked={includeFootnotes}
+              onChange={e => setIncludeFootnotes(e.target.checked)}
               className="rounded"
             />
-            각주 제외
+            각주 포함
           </label>
           <button
             onClick={handleExtract}
